@@ -124,6 +124,13 @@ export interface QueueProcessingServiceBaseProps {
   readonly scalingSteps?: ScalingInterval[];
 
   /**
+   * Specifies whether autoscaling should include CPU utilization target tracking.
+   *
+   * @default true
+   */
+  readonly enableCpuUtilizationScaling?: boolean;
+
+  /**
    * The log driver to use.
    *
    * @default - AwsLogDriver if enableLogging is true
@@ -218,6 +225,12 @@ export abstract class QueueProcessingServiceBase extends CoreConstruct {
    * The scaling interval for autoscaling based off an SQS Queue size.
    */
   public readonly scalingSteps: ScalingInterval[];
+
+  /**
+   * The preference for autoscaling to include CPU utilization target tracking.
+   */
+  public readonly scaleOnCpuUtilization: boolean;
+
   /**
    * The AwsLogDriver to use for logging if logging is enabled.
    */
@@ -256,6 +269,10 @@ export abstract class QueueProcessingServiceBase extends CoreConstruct {
     const defaultScalingSteps = [{ upper: 0, change: -1 }, { lower: 100, change: +1 }, { lower: 500, change: +5 }];
     this.scalingSteps = props.scalingSteps !== undefined ? props.scalingSteps : defaultScalingSteps;
 
+    // Set preference for autoscaling to include CPU utilization target tracking
+    this.scaleOnCpuUtilization = props.enableCpuUtilizationScaling !== undefined
+      ? props.enableCpuUtilizationScaling : true;
+
     // Create log driver if logging is enabled
     const enableLogging = props.enableLogging !== undefined ? props.enableLogging : true;
     this.logDriver = props.logDriver !== undefined
@@ -287,9 +304,11 @@ export abstract class QueueProcessingServiceBase extends CoreConstruct {
    */
   protected configureAutoscalingForService(service: BaseService) {
     const scalingTarget = service.autoScaleTaskCount({ maxCapacity: this.maxCapacity, minCapacity: this.desiredCount });
-    scalingTarget.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent: 50,
-    });
+    if (this.scaleOnCpuUtilization) {
+      scalingTarget.scaleOnCpuUtilization('CpuScaling', {
+        targetUtilizationPercent: 50,
+      });
+    }
     scalingTarget.scaleOnMetric('QueueMessagesVisibleScaling', {
       metric: this.sqsQueue.metricApproximateNumberOfMessagesVisible(),
       scalingSteps: this.scalingSteps,
