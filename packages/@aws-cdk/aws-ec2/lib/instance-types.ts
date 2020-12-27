@@ -442,6 +442,21 @@ export enum InstanceClass {
 }
 
 /**
+ * Identifies an instance's CPU architecture
+ */
+export enum InstanceArchitecture {
+  /**
+   * ARM64, Graviton architecture
+   */
+  ARM_64 = 'arm64',
+
+  /**
+   * x86-64 architecture
+   */
+  X86_64 = 'x86_64',
+}
+
+/**
  * What size of instance to use
  */
 export enum InstanceSize {
@@ -544,6 +559,7 @@ export enum InstanceSize {
  * know the identifier of the type you want.
  */
 export class InstanceType {
+
   /**
    * Instance type for EC2 instances
    *
@@ -556,7 +572,13 @@ export class InstanceType {
     return new InstanceType(`${instanceClass}.${instanceSize}`);
   }
 
+  /**
+   * The instance's CPU architecture
+   */
+  public readonly architecture: InstanceArchitecture;
+
   constructor(private readonly instanceTypeIdentifier: string) {
+    this.architecture = this.resolveArchitecture();
   }
 
   /**
@@ -564,5 +586,22 @@ export class InstanceType {
    */
   public toString(): string {
     return this.instanceTypeIdentifier;
+  }
+
+  /**
+   * Returns the CPU architecture for the instance type
+   */
+  private resolveArchitecture(): InstanceArchitecture {
+    const ARM_INSTANCE_CLASSES = new Set<InstanceClass>([
+      InstanceClass.A1, InstanceClass.C6G, InstanceClass.C6GD,
+      InstanceClass.T4G, InstanceClass.M6G, InstanceClass.R6G,
+    ]);
+    const instanceClass = this.instanceTypeIdentifier.split('.')[0] as InstanceClass;
+
+    if (ARM_INSTANCE_CLASSES.has(instanceClass)) {
+      return InstanceArchitecture.ARM_64;
+    }
+
+    return InstanceArchitecture.X86_64;
   }
 }
